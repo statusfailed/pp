@@ -24,7 +24,7 @@ gaussian mu sigma = sampleP $ fromPDF (Normal mu sigma)
 -- | WARNING: useless by itself. helper for categorical'
 pick :: [(Double, a)] -> Double -> Double -> (Double, a)
 pick [] s i = error "can't pick from empty list"
-pick xs s i = let (w, x) = go i 0 xs in (w / s, x)
+pick xs s i = let (w, x) = go i 0 xs in (log w - log s, x)
   where
     go i a (x:[]) = x
     go i a (x:xs)
@@ -35,8 +35,3 @@ categorical :: MonadRandom m => [(Double, a)] -> P m a
 categorical ws = sampleP (P r)
   where s = sum (map fst ws)
         r = pick ws s <$> uniformT 0 s
-
-{-ws = undefined :: [(Double, a)]-}
-{-xs   = cumulativeWeights ws-}
-{-n    = sum (map fst ws)-}
-{-op i = head $ dropWhile ((< i) . fst) xs-}
