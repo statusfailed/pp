@@ -1,9 +1,13 @@
+{-# LANGUAGE TupleSections #-}
 module Language.PP.Infer where
 
 import Control.Monad
 import Control.Monad.Free
-import Language.PP.Dist
+
 import Language.PP.Types
+import Language.PP.Dist (categorical)
+import Language.PP.Eval (eval)
+
 import Data.Random
 
 -- | Step an interpreter once, weighting by its probability
@@ -22,16 +26,34 @@ terminated :: PP m a -> Bool
 terminated (Free x) = False
 terminated (Pure x) = True
 
+-- Yeah, yeah. Only call this once you've checked. etc. etc.
 getPure :: PP m a -> a
 getPure (Pure x) = x
 getPure (Free x) = error "don't call getPure on Free!"
 
--- | The bootstrap filter is a distribution over probabilistic programs
-bootstrap :: MonadRandom m => Int -> PP m a -> PP m [a]
+bootstrap :: MonadRandom m => Int -> PP m a -> PP m [(Probability, a)]
 bootstrap n prog = loopstrap n (replicate n prog)
 
--- | Run all interpreters and resample the "fittest" ones
-loopstrap :: MonadRandom m => Int -> [PP m a] -> PP m [a]
+-- | distribution over weighted particles
+loopstrap :: MonadRandom m => Int -> [PP m a] -> PP m [(Probability, a)]
 loopstrap n ps
-  | all terminated ps = return $ map getPure ps
+  | all terminated ps = f ps
   | otherwise = replicateM n (liftF $ resample ps) >>= loopstrap n
+
+f :: MonadRandom m => [PP m a] -> PP m [(Probability, a)]
+f = g . sequence . map eval
+
+g :: MonadRandom m => m [(Probability, a)] -> PP m [(Probability, a)]
+g = liftF . P . fmap (0, )
+
+-- A distribution over final results
+{-valueBootstrap :: MonadRandom m => Int -> PP m a -> PP m [a]-}
+{-valueBootstrap n prog = valueLoopstrap n (replicate n prog)-}
+
+{--- | Run all interpreters and resample the "fittest" ones-}
+{---   until they're all finished-}
+{-valueLoopstrap :: MonadRandom m => Int -> [PP m a] -> PP m [a]-}
+{-valueLoopstrap n ps-}
+  {-| all terminated ps = return $ map getPure ps-}
+  {-| otherwise = replicateM n (liftF $ resample ps) >>= valueLoopstrap n-}
+

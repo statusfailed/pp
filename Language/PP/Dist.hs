@@ -21,7 +21,8 @@ fromPDF d = P . fmap (\x -> (logPdf d x, x)) . rvarT $ d
 gaussian :: MonadRandom m => Double -> Double -> P m Double
 gaussian mu sigma = sampleP $ fromPDF (Normal mu sigma)
 
--- | WARNING: useless by itself. helper for categorical'
+-- 
+-- useless by itself. helper for categorical'
 pick :: [(Double, a)] -> Double -> Double -> (Double, a)
 pick [] s i = error "can't pick from empty list"
 pick xs s i = let (w, x) = go i 0 xs in (log w - log s, x)
@@ -31,6 +32,7 @@ pick xs s i = let (w, x) = go i 0 xs in (log w - log s, x)
       | i <= (a + fst x) = x
       | otherwise        = go i (a + fst x) xs
 
+-- Choose randomly from an arbitrarily weighted list
 categorical :: MonadRandom m => [(Double, a)] -> P m a
 categorical ws = sampleP (P r)
   where s = sum (map fst ws)
