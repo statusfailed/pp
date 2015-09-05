@@ -7,7 +7,7 @@ import Language.PP.Dist
 import Language.PP.Eval
 import Language.PP.Infer
 
-import Data.Random
+import Data.Random (MonadRandom, logPdf)
 import Data.Random.Distribution.Normal
 
 import Data.List
@@ -54,6 +54,5 @@ vote xxs =  map (snd . f) (transpose xxs)
 main =
   eval (bootstrap 50 (model 0.5)) >>= print . vote . map snd . snd
 
-m2 :: PP IO Double
-m2 = liftM2 (+) g g
-  where g = liftF (gaussian 0 1)
+modelPmmh :: MonadRandom m => PMMH m Double [S]
+modelPmmh = (liftF (uniform 0 1), (\x y -> 1), model)

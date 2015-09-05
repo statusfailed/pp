@@ -5,6 +5,10 @@ import Control.Monad.Free
 
 import Language.PP.Types
 
+withP :: Monad m => P m a -> PP m (Probability, a)
+withP (P m) = liftF $ P (fmap f m)
+  where f x = (fst x, x)
+
 -- | Declare an observation with weight 'p'
 observe :: Monad m => Double -> PP m ()
 observe p = liftF . P . return $ (p, ())

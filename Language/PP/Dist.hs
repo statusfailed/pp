@@ -1,11 +1,12 @@
 module Language.PP.Dist
   ( gaussian
   , categorical
+  , Language.PP.Dist.uniform
   ) where
 
 import Language.PP.Types
 
-import Data.Random
+import Data.Random hiding (uniform)
 import Data.Random.Distribution.Normal
 import Data.Random.Distribution.Categorical hiding (categorical)
 import Data.Random.Distribution.Uniform
@@ -21,7 +22,11 @@ fromPDF d = P . fmap (\x -> (logPdf d x, x)) . rvarT $ d
 gaussian :: MonadRandom m => Double -> Double -> P m Double
 gaussian mu sigma = sampleP $ fromPDF (Normal mu sigma)
 
--- 
+uniform :: MonadRandom m => Double -> Double -> P m Double
+uniform l u = P . fmap (\x -> (1 / (u - l), x)) . sample $ d
+  where d = Uniform l u
+
+
 -- useless by itself. helper for categorical'
 pick :: [(Double, a)] -> Double -> Double -> (Double, a)
 pick [] s i = error "can't pick from empty list"
