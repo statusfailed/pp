@@ -51,8 +51,6 @@ vote xxs =  map (snd . f) (transpose xxs)
       . groupBy (==) . sort
 
 -- Run bootstrap with 100 particles over model
-main =
-  eval (bootstrap 50 (model 0.5)) >>= print . vote . map snd . snd
+bsmain =
+  eval (bootstrap 100 (model 0.5)) >>= print . vote . map snd . snd
 
-modelPmmh :: MonadRandom m => PMMH m Double [S]
-modelPmmh = (liftF (uniform 0 1), (\x y -> 1), model)
