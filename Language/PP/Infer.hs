@@ -106,11 +106,11 @@ pmmhStep :: MonadRandom m
 pmmhStep n p@(prior, q, prog) c'@(_, t', _, _) =
   proposeCandidate n p t' >>= (\c -> acceptCandidate q c c')
 
+-- Explicit looping here is a bit naff :<
 pmmhLoop 0 _ _ _ = return []
 pmmhLoop i n p c = do
   next <- pmmhStep n p c
-  rest <- pmmhLoop (i - 1) n p next
-  return (next : rest)
+  (next:) <$> pmmhLoop (i - 1) n p next
 
 pmmh :: MonadRandom m
      => Int
