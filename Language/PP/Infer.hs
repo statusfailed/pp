@@ -10,50 +10,44 @@ import Language.PP.Eval (eval)
 
 import Data.Random
 
--- | Step an interpreter once, weighting by its probability
-step :: Monad m => PP m a -> m (Double, PP m a)
-step (Free (P m)) = m
-step (Pure x)     = return (0, return x)
--- Final step repeats with probability 1 forever (termination state)
-
--- | Resample a set of interpreters by simulating a step
--- and picking the highest weights
-resample :: MonadRandom m => [PP m a] -> P m (PP m a)
-resample xs = P $ mapM (fmap unlog . step) xs >>= runP . categorical
-  where unlog (p, x) = (exp p, x) -- categorical needs non-log weights
-
+-- | True if a program is terminated (i.e. is 'Pure')
 terminated :: PP m a -> Bool
 terminated (Free x) = False
 terminated (Pure x) = True
 
--- Yeah, yeah. Only call this once you've checked. etc. etc.
+-- | Unsafely extract a 'Pure' value
 getPure :: PP m a -> a
 getPure (Pure x) = x
 getPure (Free x) = error "don't call getPure on Free!"
 
-bootstrap :: MonadRandom m => Int -> PP m a -> PP m [(Probability, a)]
-bootstrap n prog = loopstrap n (replicate n prog)
+-- | Step a program once, returning a log-weight
+step :: Monad m => Double -> PP m a -> m (Double, PP m a)
+step p (Free (P m)) = m
+step p (Pure x)     = return (p, return x)
 
--- | distribution over weighted particles
-loopstrap :: MonadRandom m => Int -> [PP m a] -> PP m [(Probability, a)]
-loopstrap n ps
-  | all terminated ps = f ps
-  | otherwise = replicateM n (liftF $ resample ps) >>= loopstrap n
+-- | Step a list of weighted programs, replacing their weights
+-- if they are not terminated.
+stepAll
+  :: MonadRandom m
+  => [(Double, PP m a)]
+  -> PP m [(Double, PP m a)]
+stepAll ps = liftF . P $ f <$> mapM (uncurry step) ps
+        -- Double of bootstrap filter itself is sum of child
+        -- probabilities
+  where f ps = (sum (map fst ps), ps)
 
-f :: MonadRandom m => [PP m a] -> PP m [(Probability, a)]
-f = g . sequence . map eval
+-- | Resample a list of weighted programs (By their log weights).
+resample
+  :: MonadRandom m
+  => Int
+  -> [(Double, PP m a)]
+  -> PP m [(Double, PP m a)]
+resample n = replicateM n . liftF . categorical . fmap f
+  where f x = (exp (fst x), x)
 
-g :: MonadRandom m => m [(Probability, a)] -> PP m [(Probability, a)]
-g = liftF . P . fmap (0, )
-
--- A distribution over final results
-{-valueBootstrap :: MonadRandom m => Int -> PP m a -> PP m [a]-}
-{-valueBootstrap n prog = valueLoopstrap n (replicate n prog)-}
-
-{--- | Run all interpreters and resample the "fittest" ones-}
-{---   until they're all finished-}
-{-valueLoopstrap :: MonadRandom m => Int -> [PP m a] -> PP m [a]-}
-{-valueLoopstrap n ps-}
-  {-| all terminated ps = return $ map getPure ps-}
-  {-| otherwise = replicateM n (liftF $ resample ps) >>= valueLoopstrap n-}
-
+bootstrap :: MonadRandom m => Int -> PP m a -> PP m [(Double, a)]
+bootstrap n prog = loop (replicate n (0.0, prog))
+  where loop ps
+          | all (terminated . snd) ps = return . map (\(p, x) -> (p, getPure x)) $ ps
+          | otherwise = stepAll ps >>= resample n >>= loop
+        f (p, x) = (p, getPure x)
