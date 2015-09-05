@@ -29,7 +29,7 @@ py s y = logPdf (Normal (mu s) 1) y
 
 mu :: S -> Double
 mu A = 0
-mu B = 5
+mu B = 3
 
 go :: MonadRandom m => Double -> Y -> S -> PP m S
 go theta y s = do
@@ -38,8 +38,7 @@ go theta y s = do
   return s'
 
 ys :: [Double]
-{-ys = [0, 5, 0, 5, 0, 5, 0, 5]-}
-ys = [0, 0, 0, 5, 0, 0, 5]
+ys = [3, 0, 3, 0]
 
 model :: MonadRandom m => Double -> PP m [S]
 model theta = sequence . scanl (>>=) (pure A) $ map (go theta) ys
@@ -52,4 +51,9 @@ vote xxs =  map (snd . f) (transpose xxs)
       . groupBy (==) . sort
 
 -- Run bootstrap with 100 particles over model
-main = eval (bootstrap 100 (model 0.5)) >>= print . vote . fmap snd . snd
+main =
+  eval (bootstrap 50 (model 0.5)) >>= print . vote . map snd . snd
+
+m2 :: PP IO Double
+m2 = liftM2 (+) g g
+  where g = liftF (gaussian 0 1)
