@@ -23,7 +23,7 @@ getPure (Free x) = error "don't call getPure on Free!"
 
 -- | Step a program once, returning a log-weight
 step :: Monad m => Double -> PP m a -> m (Double, PP m a)
-step p (Free (P m)) = m
+step p (Free (P m)) = fmap (\(p', x) -> (p + p', x)) m
 step p (Pure x)     = return (p, return x)
 
 -- | Step a list of weighted programs, replacing their weights
@@ -49,16 +49,15 @@ resample n = replicateM n . liftF . categorical . fmap f
 bootstrap :: MonadRandom m => Int -> PP m a -> PP m [(Double, a)]
 bootstrap n prog = loop (replicate n (0.0, prog))
   where loop ps
-          | all (terminated . snd) ps = return . map (\(p, x) -> (p, getPure x)) $ ps
+          | all (terminated . snd) ps = return . map f $ ps
           | otherwise = stepAll ps >>= resample n >>= loop
         f (p, x) = (p, getPure x)
 
 ------------ PMMH ------------
 
 type PMMH m theta a =
-  ( PP m theta                -- prior
-  , theta -> theta -> Double  -- Proposal probability
-  , (theta -> PP m a)         -- probabilistic program
+  ( PP m theta        -- prior
+  , (theta -> PP m a) -- probabilistic program
   )
 
 type Candidate theta a =
@@ -75,41 +74,40 @@ accept a x y = do
   return $ if (a >= 1 || p <= a) then x else y
 
 acceptCandidate :: MonadRandom m
-  => (theta -> theta -> Double) -- ^ proposal probability
-  -> Candidate theta a -- ^ proposed candidate
+  => Candidate theta a -- ^ proposed candidate
   -> Candidate theta a -- ^ previous candidate
   -> PP m (Candidate theta a) -- ^ resulting choice
-acceptCandidate q new@(pt, t, py, y) old@(pt', t', py', y')
+acceptCandidate new@(pt, t, py, y) old@(pt', t', py', y')
   = accept a new old
-  where num = py  + pt  + q t t'
-        den = py' + pt' + q t' t
-        a = num / den -- MH accept ratio
+  where num = py  + pt
+        den = py' + pt'
+        a = exp (num - den) -- MH accept ratio
 
-initialCandidate
+propose
   :: MonadRandom m
   => Int
   -> PMMH m theta a
   -> PP m (Candidate theta a)
-initialCandidate n (prior, q, prog) = do
+propose n (prior, prog) = do
   (pt, t) <- withP . P . eval $ prior
-  (py, y) <- bootstrap n (prog t) >>= withP . categorical
+  (py, y) <- bootstrap n (prog t) >>= liftF . categorical . expWeights
   return (pt, t, py, y)
-
--- | Use prior for proposal by default
-proposeCandidate n p theta = initialCandidate n p
+  where expWeights = map (\x@(w, _) -> (exp w, x))
 
 pmmhStep :: MonadRandom m
          => Int
          -> PMMH m theta a
          -> Candidate theta a
          -> PP m (Candidate theta a)
-pmmhStep n p@(prior, q, prog) c'@(_, t', _, _) =
-  proposeCandidate n p t' >>= (\c -> acceptCandidate q c c')
+pmmhStep n p@(prior, prog) c'@(_, t', _, _) =
+  propose n p >>= (\c -> acceptCandidate c c')
 
 -- Explicit looping here is a bit naff :<
 pmmhLoop 0 _ _ _ = return []
 pmmhLoop i n p c = do
-  next <- pmmhStep n p c
+  proposed <- propose n p
+  next     <- acceptCandidate proposed c
+  {-next <- pmmhStep n p c-}
   (next:) <$> pmmhLoop (i - 1) n p next
 
 pmmh :: MonadRandom m
@@ -117,4 +115,4 @@ pmmh :: MonadRandom m
      -> Int
      -> PMMH m theta a
      -> PP m ([Candidate theta a])
-pmmh m n p = initialCandidate n p >>= pmmhLoop m n p
+pmmh m n p = propose n p >>= pmmhLoop m n p
