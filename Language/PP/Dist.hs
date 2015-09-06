@@ -23,8 +23,9 @@ gaussian :: MonadRandom m => Double -> Double -> P m Double
 gaussian mu sigma = sampleP $ fromPDF (Normal mu sigma)
 
 uniform :: MonadRandom m => Double -> Double -> P m Double
-uniform l u = P . fmap (\x -> (1 / (u - l), x)) . sample $ d
+uniform l u = P . fmap (\x -> (r, x)) . sample $ d
   where d = Uniform l u
+        r = - log (u - l)
 
 
 -- useless by itself. helper for categorical'
