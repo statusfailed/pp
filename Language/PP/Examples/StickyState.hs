@@ -40,57 +40,55 @@ go theta obs s = do
   y  <- obs s'
   return (s', y)
 
+-- | Chain together a list of stages in the model
+chain :: MonadRandom m => [S -> PP m (S, Y)] -> S -> PP m [(S, Y)]
+chain []     s = return []
+chain (f:fs) s = do
+  (s', y) <- f s
+  rest    <- chain fs s'
+  return  $ (s, y) : rest
+
 -- | Put all the steps of the model together.
--- Generates either N observations (Left n), or fixes observations
--- to be "ys".
+-- Generates either N observations (Left n),
+-- or evaluates probability with given observations (Right ys)
 --
 -- NOTE: always starts in state 'A'
 model :: MonadRandom m => Either Int [Y] -> Double -> PP m [(S, Y)]
-model f theta = sequence . scanl (>>=) (pure (A, 0)) . map (.fst)
-              $ either (generate theta) (observed theta) f
+model f theta = chain (either (generate theta) (observed theta) f) A
 
+-- | Actually generate observations
 generate :: MonadRandom m => Double -> Int -> [S -> PP m (S, Y)]
 generate theta n = replicate n (f theta)
   where f theta = go theta (\s -> liftF $ gaussian (mu s) 1)
 
+-- | Use pre-observed data as the observations
 observed :: MonadRandom m => Double -> [Double] -> [S -> PP m (S, Y)]
 observed theta ys = map (go theta . obs) ys
+  where obs y s = observe (py s y) >> return y
 
-obs y s = observe (py s y) >> return y
-
+-- | P(theta)
 prior :: MonadRandom m => PP m Double
 prior = liftF $ uniform 0 1
 
 main = do
-  -- | generate observations with some made-up theta (0.8)
-  let theta  = 0.99
-      numObs = 10
+  -- generate observations with some made-up theta
+  let theta  = 0.5
+      numObs = 30
   (ss, ys') <- (unzip . snd) <$> eval (model (Left numObs) theta)
   let ys = drop 1 ys'
-  mapM_ print (zip ss ys')
+  print ss
+  print $ map round ys'
   putStrLn $ replicate 20 '-'
 
-  rs <- eval (pmmh 1000 10 (prior, model (Right ys)))
-  mapM_ print . take 500 . snd $ rs
-  
+  -- Use PMMH to estimate the joint distribution of (theta, [S])
+  (_, rs) <- eval (pmmh 1500 20 (prior, model (Right ys)))
+  print theta
+  print (estimateTheta $ take 300 rs)
+  -- note: this is a really naive way to estimate [S] but it works :-)
+  print $ let (_, _, _, ss) = head rs in map fst ss
 
-{--- Util to get result-}
-{-vote :: Ord a => [[a]] -> [a]-}
-{-vote xxs =  map (snd . f) (transpose xxs)-}
-  {-where-}
-    {-f = maximum . map (\g -> (length g, head g))-}
-      {-. groupBy (==) . sort-}
-
-{--- Asumming we know theta, run bootstrap with 100 particles over model-}
-{-bsmain = eval (bootstrap 100 (model 0.7)) >>= print . vote . map snd . snd-}
-
-{-modelPmmh :: MonadRandom m => PMMH m Double [S]-}
-{-modelPmmh = (prior, model)-}
-
-{-est :: [(a, Double, b, c)] -> Double-}
-{-est xs = let ts = map f xs in sum ts / 500.0-}
-  {-where f (_, x, _, _) = x-}
-
-{--- | Run a 1000-iteration PMMH sampler with 500 sample burn-in-}
-{--- using 10 particles, and print the trace.-}
-{-main = eval (pmmh 1000 10 modelPmmh) >>= mapM_ print . drop 500 . snd-}
+-- | Take the mean of MCMC samples
+estimateTheta :: [(a, Double, b, c)] -> Double
+estimateTheta xs =
+  let ts = map f xs in sum ts / fromIntegral (length ts)
+  where f (_, x, _, _) = x
