@@ -72,8 +72,8 @@ prior = liftF $ uniform 0 1
 
 main = do
   -- generate observations with some made-up theta
-  let theta  = 0.5
-      numObs = 30
+  let theta  = 0.75
+      numObs = 50
   (ss, ys') <- (unzip . snd) <$> eval (model (Left numObs) theta)
   let ys = drop 1 ys'
   print ss
@@ -83,7 +83,7 @@ main = do
   -- Use PMMH to estimate the joint distribution of (theta, [S])
   (_, rs) <- eval (pmmh 1500 20 (prior, model (Right ys)))
   print theta
-  print (estimateTheta $ take 300 rs)
+  print (estimateTheta . take 500 $ rs)
   -- note: this is a really naive way to estimate [S] but it works :-)
   print $ let (_, _, _, ss) = head rs in map fst ss
 
