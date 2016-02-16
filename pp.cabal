@@ -24,20 +24,29 @@ library
                    , Language.PP.Examples.StickyState
   -- other-modules:       
   -- other-extensions:    
-  build-depends:       base      >= 4.8   && < 4.9 , free      >= 4.12  && < 5
+  build-depends:       base      >= 4.8   && < 4.9
+                     , free      >= 4.12  && < 5
                      , random-fu >= 0.2.6 && < 0.3
                      , machines  >= 0.5   && < 0.6
                      , containers >= 0.5   && < 0.6
+                     , random     >= 1.1   && < 1.2
+                     , mtl        >= 2.2   && < 2.3
+                     , transformers >= 0.4.2
   --hs-source-dirs:      .
   default-language:    Haskell2010
+  --ghc-options:
+    ---fprof-auto
 
-Executable sticky-state
+executable sticky-state
   Main-Is:        Main.hs
   build-depends:       base      >= 4.8   && < 4.9
                      , free      >= 4.12  && < 5
                      , random-fu >= 0.2.6 && < 0.3
                      , machines  >= 0.5   && < 0.6
                      , containers >= 0.5   && < 0.6
+                     , random     >= 1.1   && < 1.2
+                     , mtl        >= 2.2   && < 2.3
+                     , transformers >= 0.4.2
   other-modules:   Language.PP
                  , Language.PP.Types
                  , Language.PP.Dist
@@ -45,3 +54,10 @@ Executable sticky-state
                  , Language.PP.Infer
                  , Language.PP.Infer.Bootstrap
                  , Language.PP.Examples.StickyState
+  ghc-options:
+    -O2
+    -threaded
+    ---fprof-auto
+    --"-with-rtsopts=-p"
+
+  default-language:    Haskell2010

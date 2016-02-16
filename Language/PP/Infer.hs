@@ -1,5 +1,6 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE BangPatterns #-}
 module Language.PP.Infer where
 
 import Control.Monad
@@ -59,16 +60,17 @@ pmmhStep :: MonadRandom m
          -> PMMH m theta a
          -> Candidate theta a
          -> PP m (Candidate theta a)
-pmmhStep n p@(prior, prog) c'@(_, t', _, _) =
+pmmhStep !n !p@(prior, prog) !c'@(_, t', _, _) =
   propose n p >>= (\c -> acceptCandidate c c')
 
--- Explicit looping here is a bit naff :<
-pmmhLoop 0 _ _ _ = return []
+-- Explicit looping here is a bit naff: is it also causing memory leak?
+pmmhLoop 0 _ _ v = return [v]
 pmmhLoop i n p c = do
   proposed <- propose n p
   next     <- acceptCandidate proposed c
   {-next <- pmmhStep n p c-}
-  (next:) <$> pmmhLoop (i - 1) n p next
+  {-(next:) <$!> pmmhLoop (i - 1) n p next-}
+  pmmhLoop (i - 1) n p next
 
 pmmh :: MonadRandom m
      => Int

@@ -4,6 +4,7 @@ module Language.PP.Types
   , PP
   ) where
 
+import Control.Monad
 import Control.Monad.Free
 
 type Probability = Double
@@ -13,10 +14,13 @@ type LogP        = Double
 -- randomness.  it can be run (with 'runP' to produce a value and a
 -- "Probability" of that value. 
 -- NOTE: the "Probability" is not truly a probability, so won't sum to 1.
-data P m a = P { runP :: m (Probability, a) }
+newtype P m a = P { runP :: m (Probability, a) }
 
-instance Monad m => Functor (P m) where
-  fmap f (P m) = P $ fmap (fmap f) m -- 2nd fmap is tuples
+instance Functor m => Functor (P m) where
+  fmap f = P . fmap (fmap f) . runP
+
+{-instance Monad m => Functor (P m) where-}
+  {-fmap f (P m) = P $ (\(a,b) -> (a, f $! b)) <$!> m-}
 
 -- | A Probabilistic Program is just the combination of many probabilistic
 -- values using Free.

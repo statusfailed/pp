@@ -10,6 +10,7 @@ import Data.Random hiding (uniform)
 import Data.Random.Distribution.Normal
 import Data.Random.Distribution.Categorical hiding (categorical)
 import Data.Random.Distribution.Uniform
+import Control.Monad
 
 import Data.Map as M (fromList, (!))
 
@@ -39,7 +40,13 @@ pick xs s i = let (w, x) = go i 0 xs in (log w - log s, x)
       | otherwise        = go i (a + fst x) xs
 
 -- Choose randomly from an arbitrarily weighted list
-categorical :: MonadRandom m => [(Double, a)] -> P m a
-categorical ws = sampleP (P r)
-  where s = sum (map fst ws)
-        r = pick ws s <$> uniformT 0 s
+{-categorical :: MonadRandom m => [(Double, a)] -> P m a-}
+{-categorical ws = sampleP (P $! r)-}
+  {-where s = sum (map fst ws)-}
+        {-r = pick ws s <$!> uniformT 0 s-}
+
+-- NOTE: this seems wrong - won't it pick with weighted probability and then
+-- assign that weight again?
+categorical :: MonadRandom m => [(Probability, a)] -> P m a
+categorical = P . sample . weightedCategorical . map f
+  where f (w, x) = (w, (w, x))

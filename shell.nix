@@ -4,8 +4,8 @@ let
 
   inherit (nixpkgs) pkgs;
 
-  f = { mkDerivation, base, containers, free, machines, random-fu
-      , stdenv
+  f = { mkDerivation, base, containers, free, machines, mtl, random
+      , random-fu, stdenv, transformers
       }:
       mkDerivation {
         pname = "pp";
@@ -14,10 +14,10 @@ let
         isLibrary = true;
         isExecutable = true;
         libraryHaskellDepends = [
-          base containers free machines random-fu
+          base containers free machines mtl random random-fu transformers
         ];
         executableHaskellDepends = [
-          base containers free machines random-fu
+          base containers free machines mtl random random-fu transformers
         ];
         license = stdenv.lib.licenses.mit;
       };
